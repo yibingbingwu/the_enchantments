@@ -1,5 +1,5 @@
 import sys
-from typing import Optional
+from typing import Optional, Union, List
 
 import sqlfluff
 
@@ -7,14 +7,33 @@ from sql_lineage2.sql_components.dataset import Dataset
 
 sys.setrecursionlimit(1024 * 1024)
 
+"""
+Reminder - method naming convention:
+- _eval_ auto-matched to known statements
+- proc_ need further/nested processing
+- resolve_ always returns a ready dataset 
+"""
+
+
+def _get_key(o: Union[dict, List[dict]], k: str):
+    if type(o) == list:
+        ret_list = []
+        for i in o:
+            if k in i:
+                ret_list.append(i[k])
+        return ret_list
+    elif type(o) == dict:
+        return o.get(k, None)
+    else:
+        assert False, f"Wrong object type: {str(type(o))}"
+
 
 class SqlLineage(object):
-    IMPL_PREFIX = '_proc_'
+    IMPL_PREFIX = '_eval_'
     KNOWN_TYPES = ['statement',
                    'create_table_statement',
                    'select_statement',
                    'from_expression',
-                   'from_expression_element',
                    ]
 
     def _check_impl(self):
@@ -32,14 +51,18 @@ class SqlLineage(object):
         self.sql_stmts = sql_txt or """create table test_schema.z as
         SeLEct  a.*, 1, b.blah as fOO
         from mySchema.myTable a
-        left join mySchema.yTable b on a.x=b.y
+        left join 
+        mySchema.yTable b on 
+        a.x=b.y
+        full outer join (
+        select x from mySchema.zTable) z on a.x=z.x
         where blah!='abc';
                         
         select * from test1.test2;"""
 
         self._check_impl()
 
-    def evaluate_statement(self, stmt_block: Optional[dict]):
+    def proc_statement(self, stmt_block: dict):
         assert len(stmt_block) == 1, "Unexpected Sqlfluff object structure"
         type, block = list(stmt_block.items())[0]
         if type in self.KNOWN_TYPES:
@@ -47,43 +70,51 @@ class SqlLineage(object):
             proc_func = getattr(self, func_name, None)
             proc_func(block)
 
-    def evaluate_joins(self, stmt_block: Optional[dict]) -> Optional[Dataset]:
+    def proc_joins(self, stmt_parts: Optional[list]) -> Optional[Dataset]:
+        for i in stmt_parts:
+            kw = list(i.keys())[0].lower()
+            if kw == 'from_expression_element':
+                pass
+            elif kw == 'join_on_condition':
+                pass
+            elif kw == 'from_expression_element':
+                pass
+            else:
+                continue
+
         return None
 
-    def _proc_statement(self, stmt_block: Optional[dict]) -> Optional[Dataset]:
-        return self.evaluate_statement(stmt_block)
+    def _eval_statement(self, stmt_block: dict) -> Optional[Dataset]:
+        return self.proc_statement(stmt_block)
 
-    def _proc_create_table_statement(self, stmt_parts: Optional[list]) -> Optional[Dataset]:
+    def _eval_create_table_statement(self, stmt_parts: Optional[list]) -> Optional[Dataset]:
         for p in stmt_parts:
             if 'select_statement' in p:
-                return self.evaluate_statement(p)
+                return self.proc_statement(p)
 
         assert True, 'Unknown create table statement type'
         return None
 
-    def _proc_select_statement(self, stmt_parts: Optional[dict]) -> Optional[Dataset]:
+    def _eval_select_statement(self, stmt_parts: dict) -> Optional[Dataset]:
         if 'select_clause' in stmt_parts and 'from_clause' in stmt_parts:
-            return self._resolve_basic_select(stmt_parts)
+            return self.proc_basic_select(stmt_parts)
         return None
 
-    def _proc_from_expression(self, stmt_parts: Optional[dict]) -> Optional[Dataset]:
-        ret_ds = self._resolve_from_element(stmt_parts['from_expression_element'])
-        if 'join_clause' in stmt_parts:
-            join_ds = self.evaluate_joins(stmt_parts['join_clause'])
+    def _eval_from_expression(self, stmt_parts: Union[dict, List[dict]]) -> Optional[Dataset]:
+        ret_ds = self.resolve_from_element(_get_key(stmt_parts, 'from_expression_element'))
+        join_parts = _get_key(stmt_parts, 'join_clause')
+        for j in join_parts:
+            join_ds = self.proc_joins(j)
             ret_ds = ret_ds.merge_datasets(join_ds)
-
         return ret_ds
 
-    def _proc_from_expression_element(self, stmt_parts: Optional[dict]) -> Optional[Dataset]:
-        return None
-
-    def _resolve_basic_select(self, stmt_parts: Optional[dict]) -> Optional[Dataset]:
+    def proc_basic_select(self, stmt_parts: dict) -> Optional[Dataset]:
         for f in stmt_parts['from_clause']:
             if 'from_expression' in f:
-                return self.evaluate_statement(f)
+                return self.proc_statement(f)
         return None
 
-    def _resolve_from_element(self, stmt_parts: Optional[dict]) -> Optional[Dataset]:
+    def resolve_from_element(self, stmt_parts: dict) -> Optional[Dataset]:
         ret_ds = None
         if 'table_expression' in stmt_parts:
             tab_parts = stmt_parts['table_expression']['table_reference']
@@ -105,7 +136,7 @@ class SqlLineage(object):
                 type(parsed_raw['file']) == list), "Unknown Sqlfluff parsing output"
 
         for stmt in parsed_raw['file']:
-            self.evaluate_statement(stmt)
+            self.proc_statement(stmt)
 
         print('OK')
 
