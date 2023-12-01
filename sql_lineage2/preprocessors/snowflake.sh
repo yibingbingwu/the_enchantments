@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# This script pre-processes known Snowflake SQL to make batch parsing more standard
+# e.g. Snowflake official doc says comments can only be double quotes, some versions
+# also supported single quotes
+# Test cases under test_cases/parsing_only/snowflake
 orig_fn=$1
 if [[ -z ${orig_fn} ]] || [[ ! -f ${orig_fn} ]];then
   echo "Cannot find input file ${orig_fn}"
