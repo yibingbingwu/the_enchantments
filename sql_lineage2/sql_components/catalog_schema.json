@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "http://example.com/example.json",
+  "type": "array",
+  "title": "Schema Root",
+  "description": "This schema describes what a database catalog (aka metadata store) should look like",
+  "items": {
+    "type": "object",
+    "title": "Namespace0",
+    "description": "Top-level namespace, e.g. Database in MySQL, Snowflake, Project in BigQuery, etc.",
+    "properties": {
+      "namespace": {
+        "type": "string"
+      },
+      "misc": {
+        "type": "string",
+        "description": "Anything application can use here"
+      },
+      "datasets": {
+        "type": "array",
+        "title": "Second Level Schema",
+        "description": "Second-level namespace, e.g. Schema in MySQL, Snowflake, Dataset in BigQuery, etc.",
+        "items": {
+          "type": "object",
+          "title": "Namespace1",
+          "required": [
+            "dataset",
+            "tables"
+          ],
+          "properties": {
+            "dataset": {
+              "type": "string"
+            },
+            "misc": {
+              "type": "string",
+              "description": "Anything application can use here"
+            },
+            "tables": {
+              "type": "array",
+              "title": "Third Level Schema",
+              "items": {
+                "type": "object",
+                "title": "Namespace2",
+                "required": [
+                  "table",
+                  "columns"
+                ],
+                "properties": {
+                  "table": {
+                    "type": "string"
+                  },
+                  "misc": {
+                    "type": "string",
+                    "description": "Anything application can use here"
+                  },
+                  "columns": {
+                    "type": "array",
+                    "title": "Fourth and Leaf Schema",
+                    "items": {
+                      "type": "object",
+                      "title": "Namespace3",
+                      "required": [
+                        "column",
+                        "type"
+                      ],
+                      "properties": {
+                        "column": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "string",
+                            "int",
+                            "long",
+                            "double",
+                            "float",
+                            "blob",
+                            "custom"
+                          ]
+                        },
+                        "misc": {
+                          "type": "string",
+                          "description": "Anything application can use here"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
