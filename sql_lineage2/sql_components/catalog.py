@@ -5,7 +5,7 @@ from typing import Optional
 from jsonschema import validate
 
 
-class DataCatalog(object):
+class DbCatalog(object):
     def __init__(self, levels: int = 3, default_namespace: str = None):
         assert levels in (2, 3), "Only supports two kinds of Levels: MySQL-style and Snowflake-style"
         self.levels = levels
@@ -83,7 +83,7 @@ class DataCatalog(object):
 
 
 if __name__ == '__main__':
-    dc = DataCatalog()
+    dc = DbCatalog()
     test_data = [
         {
             'namespace': 'db-01',
