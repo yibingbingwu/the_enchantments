@@ -55,4 +55,5 @@ psr.setup_catalog(CTG, default_namespace='ns_a')
 def test_basic_select_001():
     sql = """select * from ds_a.tab_a"""
     rs = psr.parse_sql(sql)
-    assert type(rs) == Dataset and rs.dataset == 'ds_a' and rs.table_name == 'tab_a', "Test failed"
+    assert type(rs) == Dataset and rs.dataset == 'ds_a' and rs.table_name == 'tab_a' and \
+           len(rs.select_columns) == 3, "Test failed"
