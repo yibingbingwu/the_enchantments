@@ -70,6 +70,8 @@
                         "type": {
                           "type": "string",
                           "enum": [
+                            "str",
+                            "varchar",
                             "string",
                             "int",
                             "long",

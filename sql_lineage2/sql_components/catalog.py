@@ -6,13 +6,17 @@ from jsonschema import validate
 
 
 class DbCatalog(object):
-    def __init__(self, levels: int = 3, default_namespace: str = None):
-        assert levels in (2, 3), "Only supports two kinds of Levels: MySQL-style and Snowflake-style"
+    def __init__(self, levels: int, default_namespace: Optional[str] = None):
+        if not levels:
+            levels = 3
+        else:
+            assert levels in (2, 3), "Only supports two kinds of Levels: MySQL-style and Snowflake-style"
+
         self.levels = levels
         self.namespace = default_namespace
+        self.dataset: Optional[str] = None
 
         curr_dir = os.path.dirname(__file__)
-        curr_fn = os.path.basename(__file__)
         schema_fn = f"{curr_dir}{os.path.sep}catalog_schema.json"
         with open(schema_fn, 'r') as fin:
             self.ctg_schema_dict = json.load(fin)
@@ -21,6 +25,10 @@ class DbCatalog(object):
     def setup_store(self, ctg: list):
         validate(ctg, schema=self.ctg_schema_dict)
         self.root = ctg
+
+    def use_dataset(self, ds: str):
+        assert ds, "Dataset/Schema name cannot be NULL"
+        self.dataset = ds
 
     def find_table(self, fq_key: str, fq_arr: list = None) -> Optional[dict]:
         names = fq_key.split('.') if fq_arr is None else fq_arr
@@ -75,8 +83,9 @@ class DbCatalog(object):
             return in_arr
 
         cl = len(in_arr)
-        assert cl + 1 == expected_level, (f"Incorrect input name: expecting {expected_level} "
-                                          f"levels but only got {cl} instead")
+        if cl == 1:
+            assert self.dataset, "Cannot resolve a table name without a default Dataset/Schema name"
+            in_arr.insert(0, self.dataset)
 
         in_arr.insert(0, self.ctg_schema_dict)
         return in_arr

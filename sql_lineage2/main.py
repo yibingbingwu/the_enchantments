@@ -3,6 +3,7 @@ from typing import Optional, Union, List
 
 import sqlfluff
 
+from sql_lineage2.sql_components.catalog import DbCatalog
 from sql_lineage2.sql_components.dataset import Dataset
 from sql_lineage2.util.maplist import MapList
 
@@ -38,11 +39,12 @@ class SqlLineage(object):
     def __init__(self, sql_txt: str = None):
         self.context = {}
         self.sql_stmts = sql_txt
+        self.db_catalog = None
         self._check_impl()
 
-    def setup_catalog(self, ctg: list):
-        # Validate
-        pass
+    def setup_catalog(self, ctg: list, levels: Optional[int] = None, default_namespace: Optional[str] = None):
+        self.db_catalog = DbCatalog(levels=levels, default_namespace=default_namespace)
+        self.db_catalog.setup_store(ctg)
 
     def proc_statement(self, stmt_block: dict):
         assert len(stmt_block) == 1, "Unexpected Sqlfluff object structure"
@@ -136,7 +138,9 @@ class SqlLineage(object):
 
         return ret_ds
 
-    def parse_sql(self):
+    def parse_sql(self, sql_txt: str = None):
+        if sql_txt:
+            self.sql_stmts = sql_txt
         parsed_raw = sqlfluff.parse(self.sql_stmts, dialect="snowflake")
         mapped_rs = MapList(parsed_raw)
         assert 'file' in mapped_rs, "Unknown Sqlfluff parsing output"
