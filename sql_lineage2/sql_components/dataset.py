@@ -1,6 +1,3 @@
-from typing import Optional
-
-
 class Dataset(object):
     def __init__(self, db: str = None, schema: str = None, tab_name: str = None):
         self.namespace = db
