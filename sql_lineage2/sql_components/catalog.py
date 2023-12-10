@@ -7,12 +7,9 @@ from jsonschema import validate
 
 class DbCatalog(object):
     def __init__(self, levels: int, default_namespace: Optional[str] = None):
-        if not levels:
-            levels = 3
-        else:
-            assert levels in (2, 3), "Only supports two kinds of Levels: MySQL-style and Snowflake-style"
+        self.levels = levels if levels else 3
+        assert self.levels in (2, 3), "Only supports two kinds of Levels: MySQL-style and Snowflake-style"
 
-        self.levels = levels
         self.namespace = default_namespace
         self.dataset: Optional[str] = None
 
