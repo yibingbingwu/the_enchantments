@@ -27,7 +27,7 @@ class DbCatalog(object):
         assert ds, "Dataset/Schema name cannot be NULL"
         self.dataset = ds
 
-    def find_table(self, fq_key: str, fq_arr: list = None) -> Optional[dict]:
+    def find_table(self, fq_key: Optional[str] = None, fq_arr: Optional[list] = None) -> Optional[dict]:
         names = fq_key.split('.') if fq_arr is None else fq_arr
         fq_names = self.pad_fq_name(names, 3)
         curr_ns: Optional[list] = None
@@ -36,7 +36,8 @@ class DbCatalog(object):
             if i == 0:
                 for x in self.root:
                     _ns = x.get('namespace', None)
-                    if (n is None and _ns is None) or n == _ns:
+                    _an = n or self.namespace
+                    if (_ns is None and _an is None) or (_ns and _an and _ns == _an):
                         curr_ns = x.get('datasets', [])
                         continue
                 if not curr_ns:
@@ -65,7 +66,7 @@ class DbCatalog(object):
     def find_column(self, fq_key: str) -> Optional[dict]:
         names = fq_key.split('.')
         fq_names = self.pad_fq_name(names, 4)
-        tab_obj = self.find_table(fq_key='', fq_arr=fq_names[:-1])
+        tab_obj = self.find_table(fq_arr=fq_names[:-1])
         if tab_obj:
             cn = fq_key[-1]
             for x in tab_obj.get('columns', []):

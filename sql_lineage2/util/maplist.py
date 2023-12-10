@@ -11,7 +11,7 @@ class MapList(object):
 
         retval = []
         for k, v in seed.items():
-            retval.append(dict(k=v))
+            retval.append({k: v})
         return retval
 
     def __init__(self, seed: Union[dict, List[dict], None]):

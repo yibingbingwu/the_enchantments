@@ -25,6 +25,7 @@ class SqlLineage(object):
                    'from_expression',
                    'join_on_condition',
                    ]
+    KW_NID = 'naked_identifier'
 
     def _check_impl(self):
         missing_impl = []
@@ -39,7 +40,8 @@ class SqlLineage(object):
     def __init__(self, sql_txt: str = None):
         self.context = {}
         self.sql_stmts = sql_txt
-        self.db_catalog = None
+        self.db_catalog: Optional[DbCatalog] = None
+        self.lineage_graph: Optional[dict] = None
         self._check_impl()
 
     def setup_catalog(self, ctg: list, levels: Optional[int] = None, default_namespace: Optional[str] = None):
@@ -115,7 +117,8 @@ class SqlLineage(object):
         return ret_ds
 
     def proc_basic_select(self, stmt_parts: dict) -> Optional[Dataset]:
-        for f in MapList.to_list(stmt_parts['from_clause']):
+        from_parts = MapList.to_list(stmt_parts['from_clause'])
+        for f in from_parts:
             if 'from_expression' in f:
                 return self.proc_statement(f)
         return None
@@ -125,16 +128,17 @@ class SqlLineage(object):
         stmts = MapList(stmt_parts)
         if 'table_expression' in stmts:
             tab_refs = MapList(stmts.get('table_expression'))
-            tab_parts = tab_refs.get('table_reference')
-            _names = [x for x in tab_parts if 'naked_identifier' in x]
+            tab_parts = tab_refs.get('table_reference')[0]
+            _names = [x[self.KW_NID] for x in tab_parts if self.KW_NID in x]
             _len = len(_names)
             for x in range(_len, 3):
                 _names.insert(0, None)
+            tab_by_name = self.db_catalog.find_table(fq_arr=_names)
             ret_ds = Dataset(db=_names[0], schema=_names[1], tab_name=_names[2])
-            ret_ds.reads_from_db()
+            ret_ds.select_columns = tab_by_name.get('columns', [])
 
         if 'alias_expression' in stmt_parts:
-            ret_ds.alias = stmt_parts['alias_expression']['naked_identifier']
+            ret_ds.alias = stmt_parts['alias_expression'][self.KW_NID]
 
         return ret_ds
 
@@ -145,10 +149,12 @@ class SqlLineage(object):
         mapped_rs = MapList(parsed_raw)
         assert 'file' in mapped_rs, "Unknown Sqlfluff parsing output"
 
+        retval = None
         for stmt in mapped_rs.get('file'):
-            self.proc_statement(stmt)
+            retval = self.proc_statement(stmt)
 
-        print('OK')
+        print('Done Parsing')
+        return retval
 
 
 if __name__ == '__main__':
