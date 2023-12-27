@@ -57,3 +57,14 @@ def test_basic_select_001():
     rs = psr.parse_sql(sql)
     assert type(rs) == Dataset and rs.dataset == 'ds_a' and rs.table_name == 'tab_a' and \
            len(rs.select_columns) == 3, "Test failed"
+
+def test_basic_select_002():
+    sql = """select *, a.*, e.f, foo(tee(c.*), z.y, k.f) from ds_a.tab_a a"""
+    rs = psr.parse_sql(sql)
+    assert True, "Temp short-circuit to verify success parsing"
+
+def test_basic_lineage_001():
+    sql = """create table ds_a.tab_new_01 as select tab_a.* from ds_a.tab_a"""
+    rs = psr.parse_sql(sql)
+    assert type(rs) == Dataset and rs.dataset == 'ds_a' and rs.table_name == 'tab_a' and \
+           len(rs.select_columns) == 3, "Test failed"

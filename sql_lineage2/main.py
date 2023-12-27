@@ -4,6 +4,7 @@ from typing import Optional, Union, List
 import sqlfluff
 
 from sql_lineage2.sql_components.catalog import DbCatalog
+from sql_lineage2.sql_components.column import Column
 from sql_lineage2.sql_components.dataset import Dataset
 from sql_lineage2.util.maplist import MapList
 
@@ -92,9 +93,15 @@ class SqlLineage(object):
         return self.proc_statement(stmt_block)
 
     def _eval_create_table_statement(self, stmt_parts: Optional[list]) -> Optional[Dataset]:
+        has_as = False
         for p in stmt_parts:
-            if 'select_statement' in p:
-                return self.proc_statement(p)
+            if 'keyword' in p and p['keyword'].lower() == 'as':
+                has_as = True
+                continue
+
+            if has_as and 'select_statement' in p:
+                rs = self.proc_statement(p)
+                return rs
 
         assert True, 'Unknown create table statement type'
         return None
@@ -118,9 +125,28 @@ class SqlLineage(object):
 
     def proc_basic_select(self, stmt_parts: dict) -> Optional[Dataset]:
         from_parts = MapList.to_list(stmt_parts['from_clause'])
+
+        source_rs = None
         for f in from_parts:
             if 'from_expression' in f:
-                return self.proc_statement(f)
+                source_rs = self.proc_statement(f)
+                break
+
+        if source_rs:
+            ret_ds = Dataset()
+            col_name_list = []
+            sel_cols = MapList.to_list(stmt_parts['select_clause'])
+            exp_list = [x['select_clause_element'] for x in sel_cols if 'select_clause_element' in x]
+            for cn in exp_list:
+                col_name_list.extend(self.find_col_names_from_expression(cn, source_rs))
+
+            for cn in col_name_list:
+                phy_cols = source_rs.resolve_name(cn)
+                for pc in phy_cols:
+                    ret_ds.select_columns.append(Column.build_from(pc))
+
+            return ret_ds
+
         return None
 
     def resolve_from_element(self, stmt_parts: Union[dict, List[dict]]) -> Optional[Dataset]:
@@ -155,6 +181,38 @@ class SqlLineage(object):
 
         print('Done Parsing')
         return retval
+
+    def expand_wildcard_cols(self, col_exp: dict, src_ds: Dataset) -> list:
+        return []
+
+    def unwind_col_ref(self, c: list):
+        l = [x.popitem()[1] for x in c]
+        return ''.join(l)
+
+    def find_col_names_from_expression(self, exp: dict, src_ds: Dataset) -> List[str]:
+        if 'wildcard_expression' in exp:
+            wc_id = exp['wildcard_expression']['wildcard_identifier']
+            tab_alias = wc_id.get('naked_identifier', None)
+            return src_ds.get_all_columns(alias=tab_alias)
+
+        elif 'function' in exp:
+            ret_list = []
+            func_params = MapList.to_list(exp['function']['bracketed'])
+            for e in func_params:
+                if 'expression' in e:
+                    sub_exp = e['expression']
+                    ret_list.extend(self.find_col_names_from_expression(sub_exp, src_ds))
+            return ret_list
+
+        elif 'column_reference' in exp:
+            retval = self.unwind_col_ref(exp['column_reference'])
+            return [retval]
+
+        elif 'star' in exp:
+            return []
+
+        else:
+            raise NotImplementedError(f"Unknown expression {exp}")
 
 
 if __name__ == '__main__':
