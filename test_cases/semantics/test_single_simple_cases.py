@@ -59,7 +59,7 @@ def test_basic_select_001():
            len(rs.select_columns) == 3, "Test failed"
 
 def test_basic_select_002():
-    sql = """select *, a.*, e.f, foo(tee(c.*), z.y, k.f) from ds_a.tab_a a"""
+    sql = """select *, a.*, e.f f0, foo(tee(c.*), z.y, k.f) from ds_a.tab_a a"""
     rs = psr.parse_sql(sql)
     assert True, "Parsing-extraction from nested wildcard chars failed"
 
