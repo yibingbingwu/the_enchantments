@@ -58,10 +58,12 @@ def test_basic_select_001():
     assert type(rs) == Dataset and rs.dataset == 'ds_a' and rs.table_name == 'tab_a' and \
            len(rs.select_columns) == 3, "Test failed"
 
+
 def test_basic_select_002():
     sql = """select *, a.*, e.f f0, foo(tee(c.*), z.y, k.f) from ds_a.tab_a a"""
     rs = psr.parse_sql(sql)
     assert True, "Parsing-extraction from nested wildcard chars failed"
+
 
 def test_basic_lineage_001():
     sql = """create table ds_a.tab_new_01 as select tab_a.* from ds_a.tab_a"""
