@@ -138,11 +138,12 @@ class SqlLineage(object):
             sel_cols = MapList.to_list(stmt_parts['select_clause'])
             exp_list = [x['select_clause_element'] for x in sel_cols if 'select_clause_element' in x]
             for cn in exp_list:
-                col_name_list.extend(self.find_col_names_from_expression(cn, source_rs))
+                cns = self.find_col_names_from_expression(cn, source_rs)
+                col_name_list.extend(cns)
 
             for cn in col_name_list:
-                phy_cols = source_rs.resolve_name(cn)
-                for pc in phy_cols:
+                col_obj = source_rs.resolve_name(cn)
+                for pc in col_obj:
                     ret_ds.select_columns.append(Column.build_from(pc))
 
             return ret_ds
@@ -152,6 +153,11 @@ class SqlLineage(object):
     def resolve_from_element(self, stmt_parts: Union[dict, List[dict]]) -> Optional[Dataset]:
         ret_ds = None
         stmts = MapList(stmt_parts)
+
+        tab_alias = None
+        if 'alias_expression' in stmt_parts:
+            tab_alias = stmt_parts['alias_expression'][self.KW_NID]
+
         if 'table_expression' in stmts:
             tab_refs = MapList(stmts.get('table_expression'))
             tab_parts = tab_refs.get('table_reference')[0]
@@ -159,12 +165,15 @@ class SqlLineage(object):
             _len = len(_names)
             for x in range(_len, 3):
                 _names.insert(0, None)
-            tab_by_name = self.db_catalog.find_table(fq_arr=_names)
-            ret_ds = Dataset(db=_names[0], schema=_names[1], tab_name=_names[2])
-            ret_ds.select_columns = tab_by_name.get('columns', [])
 
-        if 'alias_expression' in stmt_parts:
-            ret_ds.alias = stmt_parts['alias_expression'][self.KW_NID]
+            ret_ds = Dataset()
+            tab_by_name = self.db_catalog.find_table(fq_arr=_names)
+            tab_columns = tab_by_name.get('columns', [])
+            ret_ds.add_columns_from_table(db=_names[0],
+                                          schema=_names[1],
+                                          tab_name=_names[2],
+                                          alias=tab_alias,
+                                          cols=tab_columns)
 
         return ret_ds
 
@@ -193,7 +202,7 @@ class SqlLineage(object):
         if 'wildcard_expression' in exp:
             wc_id = exp['wildcard_expression']['wildcard_identifier']
             tab_alias = wc_id.get('naked_identifier', None)
-            return src_ds.get_all_columns(alias=tab_alias)
+            return src_ds.get_all_col_names(alias=tab_alias)
 
         elif 'function' in exp:
             ret_list = []
@@ -201,7 +210,8 @@ class SqlLineage(object):
             for e in func_params:
                 if 'expression' in e:
                     sub_exp = e['expression']
-                    ret_list.extend(self.find_col_names_from_expression(sub_exp, src_ds))
+                    nested_rs = self.find_col_names_from_expression(sub_exp, src_ds)
+                    ret_list.extend(nested_rs)
             return ret_list
 
         elif 'column_reference' in exp:
@@ -209,6 +219,7 @@ class SqlLineage(object):
             return [retval]
 
         elif 'star' in exp:
+            # This is the count(*) case -- ignore for now
             return []
 
         else:

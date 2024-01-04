@@ -28,6 +28,11 @@ class DbCatalog(object):
         self.dataset = ds
 
     def find_table(self, fq_key: Optional[str] = None, fq_arr: Optional[list] = None) -> Optional[dict]:
+        """
+        :param fq_key:
+        :param fq_arr:
+        :return: A Table object: {'table':_table_name_, 'columns':[{'column': _col_name_}, ...]}
+        """
         names = fq_key.split('.') if fq_arr is None else fq_arr
         fq_names = self.pad_fq_name(names, 3)
         curr_ns: Optional[list] = None
