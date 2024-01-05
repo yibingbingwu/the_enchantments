@@ -6,6 +6,7 @@ import sqlfluff
 from sql_lineage2.sql_components.catalog import DbCatalog
 from sql_lineage2.sql_components.column import Column
 from sql_lineage2.sql_components.dataset import Dataset
+from sql_lineage2.util.lineage import DepType
 from sql_lineage2.util.maplist import MapList
 
 sys.setrecursionlimit(1024 * 1024)
@@ -134,17 +135,10 @@ class SqlLineage(object):
 
         if source_rs:
             ret_ds = Dataset()
-            column_list = []
             sel_cols = MapList.to_list(stmt_parts['select_clause'])
             exp_list = [x['select_clause_element'] for x in sel_cols if 'select_clause_element' in x]
             for cn in exp_list:
-                col_objs = self.resolve_column_exp(exp=cn, src_ds=source_rs)
-                column_list.extend(col_objs)
-
-            # for cn in column_list:
-            #     col_obj = source_rs.resolve_name(cn)
-            #     for pc in col_obj:
-            #         ret_ds.select_columns.append(Column.build_from(pc))
+                col_objs = self.resolve_column_exp(exp=cn, src_ds=source_rs, dep_type=DepType.SELECT)
 
             return ret_ds
 
@@ -198,12 +192,14 @@ class SqlLineage(object):
         l = [x.popitem()[1] for x in c]
         return ''.join(l)
 
-    def resolve_column_exp(self, exp: dict, src_ds: Dataset) -> List[Column]:
+    def resolve_column_exp(self, exp: dict, src_ds: Dataset, dep_type: DepType) -> List[Column]:
         retval = []
+        known_as = exp['alias_expression'] if 'alias_expression' in exp else None
+
         if 'wildcard_expression' in exp:
             wc_id = exp['wildcard_expression']['wildcard_identifier']
             tab_alias = wc_id.get('naked_identifier', None)
-            return src_ds.get_all_col_names(alias=tab_alias)
+            return src_ds.get_all_columns(alias=tab_alias)
 
         elif 'function' in exp:
             ret_list = []
@@ -217,7 +213,10 @@ class SqlLineage(object):
 
         elif 'column_reference' in exp:
             retval = self.unwind_col_ref(exp['column_reference'])
-            return [retval]
+            col_obj = src_ds.resolve_name(retval)
+            assert col_obj, f"Column reference NOT FOUND: {exp}"
+            new_col = Column.build_from(another=col_obj, known_as=known_as, dep_type=dep_type)
+            return [new_col]
 
         elif 'star' in exp:
             # This is the count(*) case -- ignore for now
@@ -225,9 +224,6 @@ class SqlLineage(object):
 
         else:
             raise NotImplementedError(f"Unknown expression {exp}")
-
-        if 'alias_expression' in exp:
-            alias = exp['alias_expression']
 
 
 if __name__ == '__main__':

@@ -1,20 +1,4 @@
-from typing import Dict
-
-
-class Column(object):
-    @staticmethod
-    def build_from(another):
-        new_inst = Column(another.is_physical)
-        return new_inst
-
-    @staticmethod
-    def from_table(col: Dict[str, str]):
-        return Column(is_physical=True, known_as=col['column'])
-
-    def __init__(self, is_physical, known_as: str = None, direct_inherit=None):
-        self.known_as = known_as or direct_inherit.known_as
-        self.is_physical = is_physical
-        self.depend_list = [direct_inherit] if direct_inherit else []
+from sql_lineage2.util.lineage import Dependencies, DepType
 
 
 class TableColumn(object):
@@ -25,3 +9,24 @@ class TableColumn(object):
     def __init__(self, name: str, type: str):
         self.name = name
         self.type = type
+
+
+class Column(object):
+    @staticmethod
+    def build_from(another, dep_type:DepType, known_as: str = None):
+        new_inst = Column(is_physical=False, known_as=known_as, fq_name=None)
+        if another.is_physical:
+            new_inst.dependencies.add_direct(another.fq_name, dep_type)
+        else:
+            new_inst.dependencies.inherit_from(another, dep_type)
+        return new_inst
+
+    @staticmethod
+    def from_table(ns: str, ds: str, tab: str, col: TableColumn):
+        return Column(is_physical=True, known_as=col.name, fq_name='.'.join([ns, ds, tab, col.name]))
+
+    def __init__(self, is_physical, known_as: str = None, fq_name: str = None):
+        self.is_physical = is_physical
+        self.fq_name = fq_name
+        self.known_as = known_as or fq_name.split('.')[-1]
+        self.dependencies = Dependencies()
