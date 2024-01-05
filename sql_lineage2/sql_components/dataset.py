@@ -17,7 +17,7 @@ class Dataset(object):
 
     def get_all_col_names(self, alias: Optional[str]) -> List[str]:
         prefx = (alias + '.') if alias else ''
-        return [(prefx + c.known_as) for c in self.column_pools[alias]]
+        return self.column_pools[prefx]
 
     def add_join_columns(self, cols: list) -> None:
         pass
@@ -41,7 +41,11 @@ class Dataset(object):
 
         return self.column_pools[alias_idx].get(col_name, None)
 
-    def add_columns_from_table(self, db: Optional[str], schema: Optional[str], tab_name: str, alias: Optional[str],
+    def add_columns_from_table(self,
+                               db: Optional[str],
+                               schema: Optional[str],
+                               tab_name: str,
+                               alias: Optional[str],
                                cols: List[Dict[str, str]]):
         self.column_pools.pop(alias, None)
         col_objs = [Column.from_table(c) for c in cols]

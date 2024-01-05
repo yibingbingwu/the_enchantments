@@ -15,3 +15,13 @@ class Column(object):
         self.known_as = known_as or direct_inherit.known_as
         self.is_physical = is_physical
         self.depend_list = [direct_inherit] if direct_inherit else []
+
+
+class TableColumn(object):
+    """
+    This is the bare core definition of a Column as seen from metadata store
+    """
+
+    def __init__(self, name: str, type: str):
+        self.name = name
+        self.type = type

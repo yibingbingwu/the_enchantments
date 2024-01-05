@@ -134,17 +134,17 @@ class SqlLineage(object):
 
         if source_rs:
             ret_ds = Dataset()
-            col_name_list = []
+            column_list = []
             sel_cols = MapList.to_list(stmt_parts['select_clause'])
             exp_list = [x['select_clause_element'] for x in sel_cols if 'select_clause_element' in x]
             for cn in exp_list:
-                cns = self.find_col_names_from_expression(cn, source_rs)
-                col_name_list.extend(cns)
+                col_objs = self.resolve_column_exp(exp=cn, src_ds=source_rs)
+                column_list.extend(col_objs)
 
-            for cn in col_name_list:
-                col_obj = source_rs.resolve_name(cn)
-                for pc in col_obj:
-                    ret_ds.select_columns.append(Column.build_from(pc))
+            # for cn in column_list:
+            #     col_obj = source_rs.resolve_name(cn)
+            #     for pc in col_obj:
+            #         ret_ds.select_columns.append(Column.build_from(pc))
 
             return ret_ds
 
@@ -198,7 +198,8 @@ class SqlLineage(object):
         l = [x.popitem()[1] for x in c]
         return ''.join(l)
 
-    def find_col_names_from_expression(self, exp: dict, src_ds: Dataset) -> List[str]:
+    def resolve_column_exp(self, exp: dict, src_ds: Dataset) -> List[Column]:
+        retval = []
         if 'wildcard_expression' in exp:
             wc_id = exp['wildcard_expression']['wildcard_identifier']
             tab_alias = wc_id.get('naked_identifier', None)
@@ -210,7 +211,7 @@ class SqlLineage(object):
             for e in func_params:
                 if 'expression' in e:
                     sub_exp = e['expression']
-                    nested_rs = self.find_col_names_from_expression(sub_exp, src_ds)
+                    nested_rs = self.resolve_column_exp(sub_exp, src_ds)
                     ret_list.extend(nested_rs)
             return ret_list
 
@@ -224,6 +225,9 @@ class SqlLineage(object):
 
         else:
             raise NotImplementedError(f"Unknown expression {exp}")
+
+        if 'alias_expression' in exp:
+            alias = exp['alias_expression']
 
 
 if __name__ == '__main__':

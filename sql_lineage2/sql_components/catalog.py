@@ -1,8 +1,16 @@
 import json
 import os.path
-from typing import Optional
+from typing import Optional, List
 
 from jsonschema import validate
+
+from sql_lineage2.sql_components.column import TableColumn
+
+
+def _replace_col_obj(table_def: dict):
+    tab_cols = table_def.pop('columns')
+    new_objs = [TableColumn(name=x['column'], type=x['type']) for x in tab_cols]
+    table_def['columns'] = new_objs
 
 
 class DbCatalog(object):
@@ -22,17 +30,54 @@ class DbCatalog(object):
     def setup_store(self, ctg: list):
         validate(ctg, schema=self.ctg_schema_dict)
         self.root = ctg
+        for ns in self.root:
+            for ds in ns.get('datasets', []):
+                for tb in ds.get('tables', []):
+                    _replace_col_obj(tb)
+
+    def add_table(self, new_ds: str, new_tab: str, new_cols: List[TableColumn], new_ns: str = None):
+        ns_val = new_ns or self.namespace
+        ns_struct = None
+        for x in self.root:
+            if x['namespace'] == ns_val:
+                ns_struct = x
+                break
+
+        if not ns_struct:
+            ns_struct = {
+                'namespace': ns_val,
+                'datasets': []
+            }
+            self.root.append(ns_struct)
+
+        ds_struct = None
+        for y in ns_struct['datasets']:
+            if y.get('dataset', '') == new_ds:
+                ds_struct = y
+                break
+
+        if not ds_struct:
+            ds_struct = {
+                'dataset': new_ds,
+                'tables': []
+            }
+            ns_struct['datasets'].append(ds_struct)
+
+        for i, z in enumerate(ds_struct['tables']):
+            if z.get('table', '') == new_tab:
+                del ds_struct['tables'][i]
+                break
+
+        tab_struct = {'table': new_tab,
+                      'columns': new_cols
+                      }
+        ds_struct['tables'].append(tab_struct)
 
     def use_dataset(self, ds: str):
         assert ds, "Dataset/Schema name cannot be NULL"
         self.dataset = ds
 
     def find_table(self, fq_key: Optional[str] = None, fq_arr: Optional[list] = None) -> Optional[dict]:
-        """
-        :param fq_key:
-        :param fq_arr:
-        :return: A Table object: {'table':_table_name_, 'columns':[{'column': _col_name_}, ...]}
-        """
         names = fq_key.split('.') if fq_arr is None else fq_arr
         fq_names = self.pad_fq_name(names, 3)
         curr_ns: Optional[list] = None
