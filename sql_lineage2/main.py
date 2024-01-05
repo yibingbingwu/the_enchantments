@@ -139,6 +139,7 @@ class SqlLineage(object):
             exp_list = [x['select_clause_element'] for x in sel_cols if 'select_clause_element' in x]
             for cn in exp_list:
                 col_objs = self.resolve_column_exp(exp=cn, src_ds=source_rs, dep_type=DepType.SELECT)
+                ## HERE HERE
 
             return ret_ds
 
@@ -163,7 +164,7 @@ class SqlLineage(object):
             ret_ds = Dataset()
             tab_by_name = self.db_catalog.find_table(fq_arr=_names)
             tab_columns = tab_by_name.get('columns', [])
-            ret_ds.add_columns_from_table(db=_names[0],
+            ret_ds.add_columns_from_table(namespace=_names[0],
                                           schema=_names[1],
                                           tab_name=_names[2],
                                           alias=tab_alias,
