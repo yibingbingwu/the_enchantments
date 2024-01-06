@@ -73,6 +73,10 @@ class DbCatalog(object):
                       }
         ds_struct['tables'].append(tab_struct)
 
+    def use_namespace(self, ns: str):
+        assert ns, "Namespace/Project name cannot be NULL"
+        self.namespace = ns
+
     def use_dataset(self, ds: str):
         assert ds, "Dataset/Schema name cannot be NULL"
         self.dataset = ds

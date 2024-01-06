@@ -11,10 +11,10 @@ class Dataset(object):
         if alias:
             return self.column_pools[alias]
 
-        retval = []
+        retval = set()
         for k, v in self.column_pools.items():
-            retval.extend(v)
-        return retval
+            retval.update(v)
+        return list(retval)
 
     def add_join_columns(self, cols: list) -> None:
         pass
@@ -54,15 +54,15 @@ class Dataset(object):
 
     def set_columns_from_table(self,
                                namespace: Optional[str],
-                               schema: Optional[str],
+                               dataset: Optional[str],
                                tab_name: str,
                                alias: Optional[str],
                                cols: List[TableColumn]):
-        col_objs = [Column.from_table(namespace, schema, tab_name, tc) for tc in cols]
+        col_objs = [Column.from_table(namespace, dataset, tab_name, tc) for tc in cols]
         self.column_pools[alias] = col_objs
         self.column_pools[tab_name] = col_objs
-        if schema:
-            self.column_pools[schema + '.' + tab_name] = col_objs
+        if dataset:
+            self.column_pools[dataset + '.' + tab_name] = col_objs
 
     def add_columns_from_select(self,
                                 alias: Optional[str],

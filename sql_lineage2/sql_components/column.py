@@ -1,6 +1,10 @@
-from typing import List
+import enum
 
-from sql_lineage2.util.lineage import Dependencies, DepType
+
+class DepType(enum.Enum):
+    SELECT = 1
+    JOIN = 2
+    WHERE = 3
 
 
 class TableColumn(object):
@@ -39,3 +43,24 @@ class Column(object):
         self.fq_name = fq_name
         self.known_as = known_as or fq_name.split('.')[-1]
         self.dependencies = Dependencies()
+
+
+class Dependencies(object):
+    def __init__(self):
+        self.dep_pool = {
+            DepType.SELECT: set(),
+            DepType.JOIN: set(),
+            DepType.WHERE: set(),
+        }
+
+    def add_direct(self, fq_name: str, type: DepType = DepType.SELECT):
+        self.dep_pool[type].add(fq_name)
+
+    def inherit_from(self, another: Column, type: DepType = DepType.SELECT):
+        self.dep_pool[type].update(another.dependencies.get_all())
+
+    def get_all(self):
+        retval = set()
+        for v in self.dep_pool.values():
+            retval.update(v)
+        return retval
