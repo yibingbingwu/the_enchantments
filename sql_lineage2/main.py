@@ -139,7 +139,7 @@ class SqlLineage(object):
             exp_list = [x['select_clause_element'] for x in sel_cols if 'select_clause_element' in x]
             for cn in exp_list:
                 col_objs = self.resolve_column_exp(exp=cn, src_ds=source_rs, dep_type=DepType.SELECT)
-                ## HERE HERE
+                ret_ds.add_columns_from_select(alias=None, cols=col_objs)
 
             return ret_ds
 
@@ -164,7 +164,7 @@ class SqlLineage(object):
             ret_ds = Dataset()
             tab_by_name = self.db_catalog.find_table(fq_arr=_names)
             tab_columns = tab_by_name.get('columns', [])
-            ret_ds.add_columns_from_table(namespace=_names[0],
+            ret_ds.set_columns_from_table(namespace=_names[0],
                                           schema=_names[1],
                                           tab_name=_names[2],
                                           alias=tab_alias,
@@ -194,8 +194,9 @@ class SqlLineage(object):
         return ''.join(l)
 
     def resolve_column_exp(self, exp: dict, src_ds: Dataset, dep_type: DepType) -> List[Column]:
-        retval = []
         known_as = exp['alias_expression'] if 'alias_expression' in exp else None
+
+        col_alias = exp['alias_expression'][self.KW_NID] if 'alias_expression' in exp else None
 
         if 'wildcard_expression' in exp:
             wc_id = exp['wildcard_expression']['wildcard_identifier']
@@ -203,20 +204,24 @@ class SqlLineage(object):
             return src_ds.get_all_columns(alias=tab_alias)
 
         elif 'function' in exp:
-            ret_list = []
+            assert col_alias, f"Function column does not have an alias? {exp}"
+            dep_list = []
             func_params = MapList.to_list(exp['function']['bracketed'])
             for e in func_params:
                 if 'expression' in e:
                     sub_exp = e['expression']
-                    nested_rs = self.resolve_column_exp(sub_exp, src_ds)
-                    ret_list.extend(nested_rs)
-            return ret_list
+                    nested_rs = self.resolve_column_exp(exp=sub_exp, src_ds=src_ds, dep_type=dep_type)
+                    dep_list.extend(nested_rs)
+            new_col = Column.derived(params=dep_list, dep_type=dep_type, known_as=known_as)
+            return [new_col]
 
         elif 'column_reference' in exp:
-            retval = self.unwind_col_ref(exp['column_reference'])
-            col_obj = src_ds.resolve_name(retval)
+            col_ref = self.unwind_col_ref(exp['column_reference'])
+            col_obj = src_ds.resolve_name(col_ref)
             assert col_obj, f"Column reference NOT FOUND: {exp}"
             new_col = Column.build_from(another=col_obj, known_as=known_as, dep_type=dep_type)
+            if col_alias:
+                new_col.known_as = col_alias
             return [new_col]
 
         elif 'star' in exp:
