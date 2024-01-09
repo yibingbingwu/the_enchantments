@@ -4,7 +4,7 @@ from typing import Optional, Union, List
 import sqlfluff
 
 from sql_lineage2.sql_components.catalog import DbCatalog
-from sql_lineage2.sql_components.column import Column, DepType
+from sql_lineage2.sql_components.column import Column, DepType, Dependencies
 from sql_lineage2.sql_components.dataset import Dataset
 from sql_lineage2.util.maplist import MapList
 
@@ -42,7 +42,7 @@ class SqlLineage(object):
         self.context = {}
         self.sql_stmts = sql_txt
         self.db_catalog: Optional[DbCatalog] = None
-        self.lineage_graph: Optional[dict] = None
+        self.lineage_graph = dict()
         self._check_impl()
 
     def setup_catalog(self, ctg: list, levels: Optional[int] = None, default_namespace: Optional[str] = None):
@@ -100,14 +100,22 @@ class SqlLineage(object):
 
     def _eval_create_table_statement(self, stmt_parts: Optional[list]) -> Optional[Dataset]:
         has_as = False
+        dst_fq_tab = None
         for p in stmt_parts:
             if 'keyword' in p and p['keyword'].lower() == 'as':
                 has_as = True
                 continue
 
+            if 'table_reference' in p:
+                dst_name_list = [x['naked_identifier'] for x in p['table_reference'] if 'naked_identifier' in x]
+                dst_fq_tab = '.'.join(self.pad_nfq_name(dst_name_list))
+
             if has_as and 'select_statement' in p:
-                rs = self.proc_statement(p)
-                return rs
+                rs: Dataset = self.proc_statement(p)
+                for c in rs.get_all_columns(alias=None):
+                    new_col_fq = dst_fq_tab + '.' + c.known_as
+                    self.add_column_lineage(new_col_fq, c.dependencies)
+                break
 
         assert True, 'Unknown create table statement type'
         return None
@@ -206,7 +214,7 @@ class SqlLineage(object):
         if 'wildcard_expression' in exp:
             wc_id = exp['wildcard_expression']['wildcard_identifier']
             tab_alias = wc_id.get('naked_identifier', None)
-            retval = src_ds.get_all_columns(alias=tab_alias)
+            retval = [Column.build_from(c, dep_type) for c in src_ds.get_all_columns(alias=tab_alias)]
             return retval
 
         elif 'function' in exp:
@@ -236,6 +244,27 @@ class SqlLineage(object):
 
         else:
             raise NotImplementedError(f"Unknown expression {exp}")
+
+    def pad_nfq_name(self, nfq_tab_name: list[str]) -> List[str]:
+        if len(nfq_tab_name) == 1:
+            nfq_tab_name.insert(0, self.db_catalog.dataset)
+
+        if len(nfq_tab_name) == 2:
+            nfq_tab_name.insert(0, self.db_catalog.namespace)
+
+        return nfq_tab_name
+
+    def add_column_lineage(self, col_name: str, col_deps: Dependencies):
+        if col_name not in self.lineage_graph:
+            self.lineage_graph[col_name] = {
+                'SELECT': set(),
+                'JOIN': set(),
+                'WHERE': set(),
+            }
+
+        self.lineage_graph[col_name]['SELECT'].update(col_deps.dep_pool.get(DepType.SELECT))
+        self.lineage_graph[col_name]['JOIN'].update(col_deps.dep_pool.get(DepType.JOIN))
+        self.lineage_graph[col_name]['WHERE'].update(col_deps.dep_pool.get(DepType.WHERE))
 
 
 if __name__ == '__main__':

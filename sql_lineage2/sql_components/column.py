@@ -20,7 +20,7 @@ class TableColumn(object):
 class Column(object):
     @staticmethod
     def build_from(another, dep_type: DepType, known_as: str = None):
-        new_inst = Column(is_physical=False, known_as=known_as, fq_name=None)
+        new_inst = Column(is_physical=False, known_as=known_as, fq_name=another.known_as)
         if another.is_physical:
             new_inst.dependencies.add_direct(another.fq_name, dep_type)
         else:

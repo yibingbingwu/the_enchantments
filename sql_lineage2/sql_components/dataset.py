@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict
 
-from sql_lineage2.sql_components.column import Column, TableColumn
+from sql_lineage2.sql_components.column import Column, TableColumn, DepType
 
 
 class Dataset(object):
