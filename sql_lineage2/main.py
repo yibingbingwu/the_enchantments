@@ -4,9 +4,9 @@ from typing import Optional, Union, List, Dict
 import sqlfluff
 
 from sql_lineage2 import KW_NID
-from sql_lineage2.sql_components.catalog import DbCatalog
-from sql_lineage2.sql_components.column import Column, DepType, Dependencies
-from sql_lineage2.sql_components.dataset import Dataset
+from sql_lineage2.db_components.catalog import DbCatalog
+from sql_lineage2.db_components.column import Column, DepType, Dependencies
+from sql_lineage2.db_components.dataset import Dataset
 from sql_lineage2.util.maplist import MapList
 
 sys.setrecursionlimit(1024 * 1024)

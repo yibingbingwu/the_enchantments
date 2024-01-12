@@ -1,5 +1,5 @@
-from sql_lineage2.sql_components.catalog import DbCatalog
-from sql_lineage2.sql_components.column import TableColumn
+from sql_lineage2.db_components.catalog import DbCatalog
+from sql_lineage2.db_components.column import TableColumn
 
 
 def test_db_catalog_basic():

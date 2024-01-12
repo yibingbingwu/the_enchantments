@@ -1,6 +1,6 @@
 from sql_lineage2.main import SqlLineage
-from sql_lineage2.sql_components.column import Column
-from sql_lineage2.sql_components.dataset import Dataset
+from sql_lineage2.db_components.column import Column
+from sql_lineage2.db_components.dataset import Dataset
 
 CTG = [
     {

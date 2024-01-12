@@ -5,9 +5,7 @@ from typing import Optional, List, Union
 
 from jsonschema import validate
 
-from sql_lineage2 import KW_NID
-from sql_lineage2.sql_components.column import TableColumn
-from sql_lineage2.util.maplist import MapList
+from sql_lineage2.db_components.column import TableColumn
 
 
 def _replace_col_obj(table_def: dict):
@@ -144,4 +142,3 @@ class DbCatalog(object):
                 ret_arr.insert(0, self.namespace)
         return ret_arr
 
-# Test case in "test_cases"

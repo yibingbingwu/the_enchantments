@@ -53,6 +53,6 @@ psr = SqlLineage()
 psr.setup_catalog(CTG, default_namespace='ns_a')
 
 
-def test_multi_target_insert_001():
+def test_insert_001():
     # TODO
     pass
