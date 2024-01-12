@@ -77,6 +77,7 @@ def test_complex_alias_001():
 
 
 def test_complex_alias_002():
+    # TODO
     psr.use_dataset('ds_a')
     sql = """select * from tab_a t0 join tab_b on col_a1=col_b1"""
     rs = psr.parse_sql(sql)
@@ -84,6 +85,7 @@ def test_complex_alias_002():
 
 
 def test_basic_select_002():
+    # TODO
     sql = """select *, a.*, e.f f0, foo(tee(*), z.y, k.f) from ds_a.tab_a a"""
     rs = psr.parse_sql(sql)
     assert True, "Use this one to test parsing results"
