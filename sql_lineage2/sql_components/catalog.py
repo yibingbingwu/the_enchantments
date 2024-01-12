@@ -1,10 +1,13 @@
+import copy
 import json
 import os.path
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from jsonschema import validate
 
+from sql_lineage2 import KW_NID
 from sql_lineage2.sql_components.column import TableColumn
+from sql_lineage2.util.maplist import MapList
 
 
 def _replace_col_obj(table_def: dict):
@@ -83,7 +86,7 @@ class DbCatalog(object):
 
     def find_table(self, fq_key: Optional[str] = None, fq_arr: Optional[list] = None) -> Optional[dict]:
         names = fq_key.split('.') if fq_arr is None else fq_arr
-        fq_names = self.pad_fq_name(names, 3)
+        fq_names = self.qualify_db_obj_name(input_v=names, target_levels=3)
         curr_ns: Optional[list] = None
         curr_ds: Optional[list] = None
         for i, n in enumerate(fq_names):
@@ -112,14 +115,15 @@ class DbCatalog(object):
                 for x in curr_ds:
                     _tn = x.get('table', None)
                     if n == _tn:
-                        return x
+                        retval = {'namespace': fq_names[0], 'dataset': fq_names[1]}
+                        retval.update(x)
+                        return retval
                 return None
 
         return None
 
     def find_column(self, fq_key: str) -> Optional[dict]:
-        names = fq_key.split('.')
-        fq_names = self.pad_fq_name(names, 4)
+        fq_names = self.qualify_db_obj_name(input_v=fq_key, target_levels=4)
         tab_obj = self.find_table(fq_arr=fq_names[:-1])
         if tab_obj:
             cn = fq_key[-1]
@@ -130,16 +134,14 @@ class DbCatalog(object):
 
         return None
 
-    def pad_fq_name(self, in_arr: list, expected_level: int) -> list:
-        if len(in_arr) == expected_level:
-            return in_arr
-
-        cl = len(in_arr)
-        if cl == 1:
-            assert self.dataset, "Cannot resolve a table name without a default Dataset/Schema name"
-            in_arr.insert(0, self.dataset)
-
-        in_arr.insert(0, self.ctg_schema_dict)
-        return in_arr
+    def qualify_db_obj_name(self, input_v: Union[str, List[dict]] = None,
+                            target_levels: int = -1):
+        ret_arr = copy.deepcopy(input_v) if type(input_v) == list else input_v.split('.')
+        if target_levels > 0:
+            if target_levels - len(ret_arr) == 2:
+                ret_arr.insert(0, self.dataset)
+            if target_levels - len(ret_arr) == 1:
+                ret_arr.insert(0, self.namespace)
+        return ret_arr
 
 # Test case in "test_cases"

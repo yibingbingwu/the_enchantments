@@ -1,8 +1,9 @@
 import sys
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Dict
 
 import sqlfluff
 
+from sql_lineage2 import KW_NID
 from sql_lineage2.sql_components.catalog import DbCatalog
 from sql_lineage2.sql_components.column import Column, DepType, Dependencies
 from sql_lineage2.sql_components.dataset import Dataset
@@ -26,7 +27,6 @@ class SqlLineage(object):
                    'from_expression',
                    'join_on_condition',
                    ]
-    KW_NID = 'naked_identifier'
 
     def _check_impl(self):
         missing_impl = []
@@ -107,7 +107,7 @@ class SqlLineage(object):
                 continue
 
             if 'table_reference' in p:
-                dst_name_list = [x['naked_identifier'] for x in p['table_reference'] if 'naked_identifier' in x]
+                dst_name_list = self.unwind_col_ref(MapList.to_list(p['table_reference']))
                 dst_fq_tab = '.'.join(self.pad_nfq_name(dst_name_list))
 
             if has_as and 'select_statement' in p:
@@ -159,29 +159,28 @@ class SqlLineage(object):
         return None
 
     def resolve_from_element(self, stmt_parts: Union[dict, List[dict]]) -> Optional[Dataset]:
-        ret_ds = None
+        ret_ds: Optional[Dataset] = None
         stmts = MapList(stmt_parts)
 
         tab_alias = None
-        if 'alias_expression' in stmt_parts:
-            tab_alias = stmt_parts['alias_expression'][self.KW_NID]
-
         if 'table_expression' in stmts:
             tab_refs = MapList(stmts.get('table_expression'))
-            tab_parts = tab_refs.get('table_reference')[0]
-            _names = [x[self.KW_NID] for x in tab_parts if self.KW_NID in x]
-            _len = len(_names)
-            for x in range(_len, 3):
-                _names.insert(0, None)
+            tab_parts = MapList.to_list(tab_refs.get('table_reference')[0])
+            tab_names = self.unwind_col_ref(tab_parts)
 
             ret_ds = Dataset()
-            tab_by_name = self.db_catalog.find_table(fq_arr=_names)
+            tab_by_name = self.db_catalog.find_table(fq_arr=tab_names)
             tab_columns = tab_by_name.get('columns', [])
-            ret_ds.set_columns_from_table(namespace=_names[0] or self.db_catalog.namespace,
-                                          dataset=_names[1] or self.db_catalog.dataset,
-                                          tab_name=_names[2],
+            ret_ds.set_columns_from_table(namespace=tab_by_name['namespace'],
+                                          dataset=tab_by_name['dataset'],
+                                          tab_name=tab_by_name['table'],
                                           alias=tab_alias,
                                           cols=tab_columns)
+
+        if 'alias_expression' in stmts:
+            tab_alias = stmts.get('alias_expression')[0][KW_NID]
+            if ret_ds:
+                ret_ds.add_alias(tab_alias)
 
         return ret_ds
 
@@ -199,17 +198,13 @@ class SqlLineage(object):
         print('Done Parsing')
         return retval
 
-    def expand_wildcard_cols(self, col_exp: dict, src_ds: Dataset) -> list:
-        return []
-
-    def unwind_col_ref(self, c: list):
-        l = [x.popitem()[1] for x in c]
-        return ''.join(l)
+    def unwind_col_ref(self, obj_ref: List[Dict[str, str]]) -> List[str]:
+        return [x[KW_NID] for x in obj_ref if KW_NID in x]
 
     def resolve_column_exp(self, exp: dict, src_ds: Dataset, dep_type: DepType) -> List[Column]:
         known_as = exp['alias_expression'] if 'alias_expression' in exp else None
 
-        col_alias = exp['alias_expression'][self.KW_NID] if 'alias_expression' in exp else None
+        col_alias = exp['alias_expression'][KW_NID] if 'alias_expression' in exp else None
 
         if 'wildcard_expression' in exp:
             wc_id = exp['wildcard_expression']['wildcard_identifier']
@@ -230,7 +225,8 @@ class SqlLineage(object):
             return [new_col]
 
         elif 'column_reference' in exp:
-            col_ref = self.unwind_col_ref(exp['column_reference'])
+            col_parts = self.unwind_col_ref(MapList.to_list(exp['column_reference']))
+            col_ref = '.'.join(col_parts)
             col_obj = src_ds.resolve_name(col_ref)
             assert col_obj, f"Column reference NOT FOUND: {exp}"
             new_col = Column.build_from(another=col_obj, known_as=known_as, dep_type=dep_type)

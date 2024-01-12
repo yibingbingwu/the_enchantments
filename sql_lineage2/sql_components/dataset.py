@@ -5,10 +5,11 @@ from sql_lineage2.sql_components.column import Column, TableColumn, DepType
 
 class Dataset(object):
     def __init__(self):
-        self.column_pools: Dict[str, List[Column]] = dict()
+        self.column_pools: Dict[Optional[str], List[Column]] = dict()
 
     def get_all_columns(self, alias: Optional[str]) -> List[Column]:
         if alias:
+            # Do not use column_pools.get(alias,[]) -- rather it fails
             return self.column_pools[alias]
 
         retval = set()
@@ -21,6 +22,9 @@ class Dataset(object):
 
     def absorb_another(self, another_ds) -> None:
         pass
+
+    def add_alias(self, alias: str) -> None:
+        self.column_pools[alias] = self.column_pools[None]
 
     def resolve_name(self, col_name: str) -> Optional[Column]:
         col_parts = col_name.split('.')
@@ -67,4 +71,7 @@ class Dataset(object):
     def add_columns_from_select(self,
                                 alias: Optional[str],
                                 cols: List[Column]):
-        self.column_pools[alias] = cols if alias not in self.column_pools else self.column_pools[alias].extend(cols)
+        if alias not in self.column_pools:
+            self.column_pools[alias] = cols
+        else:
+            self.column_pools[alias].extend(cols)

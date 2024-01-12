@@ -1,4 +1,5 @@
 import enum
+from typing import Dict, Set
 
 
 class DepType(enum.Enum):
@@ -47,7 +48,7 @@ class Column(object):
 
 class Dependencies(object):
     def __init__(self):
-        self.dep_pool = {
+        self.dep_pool: Dict[DepType, Set[str]] = {
             DepType.SELECT: set(),
             DepType.JOIN: set(),
             DepType.WHERE: set(),
@@ -59,7 +60,7 @@ class Dependencies(object):
     def inherit_from(self, another: Column, type: DepType = DepType.SELECT):
         self.dep_pool[type].update(another.dependencies.get_all())
 
-    def get_all(self):
+    def get_all(self) -> Set[str]:
         retval = set()
         for v in self.dep_pool.values():
             retval.update(v)
