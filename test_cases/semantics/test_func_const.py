@@ -61,3 +61,10 @@ def test_function_001():
 def test_constants_001():
     # TODO
     pass
+
+
+def test_basic_select_002():
+    # TODO
+    sql = """select *, a.*, e.f f0, foo(tee(*), z.y, k.f) from ds_a.tab_a a"""
+    rs = psr.parse_sql(sql)
+    assert True, "Use this one to test parsing results"

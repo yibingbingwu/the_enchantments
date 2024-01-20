@@ -84,7 +84,7 @@ class SqlLineage(object):
                 continue
 
             if fnd_ds and kw == 'join_on_condition':
-                cond_cols = self.proc_statement(kw)
+                cond_cols = self.proc_statement(i)
                 existing_ds.add_join_columns(cond_cols.join_columns)
                 continue
 
@@ -133,6 +133,9 @@ class SqlLineage(object):
         ret_ds = self.resolve_from_element(stmts.get('from_expression_element'))
         join_parts = stmts.get('join_clause')
         if join_parts:
+            if type(join_parts) == list and type(join_parts[0]) == dict:
+                # When if there is only one JOIN clause, parser returns a list of dicts instead of a list of list
+                join_parts = [join_parts]
             for j in join_parts:
                 ret_ds = self.proc_join_into_ds(j, ret_ds)
         return ret_ds
@@ -158,14 +161,11 @@ class SqlLineage(object):
 
         return None
 
-    def resolve_from_element(self, stmt_parts: Union[dict, List[dict]]) -> Optional[Dataset]:
-        ret_ds: Optional[Dataset] = None
-        stmts = MapList(stmt_parts)
-
-        tab_alias = None
-        if 'table_expression' in stmts:
-            tab_refs = MapList(stmts.get('table_expression'))
-            tab_parts = MapList.to_list(tab_refs.get('table_reference')[0])
+    def resolve_table_expression(self, stmt_parts: List[dict]) -> Optional[Dataset]:
+        assert type(stmt_parts) == list and len(stmt_parts) and type(stmt_parts[0]) == dict
+        tab_exp = stmt_parts[0]
+        if 'table_reference' in tab_exp:
+            tab_parts = MapList.to_list(tab_exp.get('table_reference'))
             tab_names = self.unwind_col_ref(tab_parts)
 
             ret_ds = Dataset()
@@ -174,8 +174,20 @@ class SqlLineage(object):
             ret_ds.set_columns_from_table(namespace=tab_by_name['namespace'],
                                           dataset=tab_by_name['dataset'],
                                           tab_name=tab_by_name['table'],
-                                          alias=tab_alias,
+                                          alias=None,
                                           cols=tab_columns)
+            return ret_ds
+        elif 'bracketed' in tab_exp:
+            return None
+        else:
+            raise NotImplementedError('Unknown table_expression content')
+
+    def resolve_from_element(self, stmt_parts: Union[dict, List[dict]]) -> Optional[Dataset]:
+        ret_ds: Optional[Dataset] = None
+        stmts = MapList(stmt_parts)
+
+        if 'table_expression' in stmts:
+            ret_ds = self.resolve_table_expression(stmts.get('table_expression'))
 
         if 'alias_expression' in stmts:
             tab_alias = stmts.get('alias_expression')[0][KW_NID]

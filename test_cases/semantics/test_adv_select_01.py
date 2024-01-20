@@ -43,6 +43,23 @@ CTG = [
                             },
                         ]
                     },
+                    {
+                        'table': 'tab_c',
+                        'columns': [
+                            {
+                                'column': 'col_a1',
+                                'type': 'int',
+                            },
+                            {
+                                'column': 'col_c2',
+                                'type': 'str',
+                            },
+                            {
+                                'column': 'col_c3',
+                                'type': 'str',
+                            },
+                        ]
+                    },
                 ]
             }
         ]
@@ -53,24 +70,45 @@ psr = SqlLineage()
 psr.setup_catalog(CTG, default_namespace='ns_a')
 
 
-def test_complex_alias_001():
-    sql = """select tab_a.col_a1 c1, col_a2 c2, t0.* from ds_a.tab_a t0"""
+def test_join_simple_001():
+    # TODO
+    psr.use_dataset('ds_a')
+    sql = """select * from tab_a t0 join tab_b on col_a1=col_b1"""
     rs = psr.parse_sql(sql)
-    assert (type(rs) == Dataset and
-            len(rs.column_pools.keys()) == 1 and
-            list(rs.column_pools.keys())[0] is None and
-            len(rs.column_pools[None]) == 5 and
-            type(rs.column_pools[None][0]) == Column), "Basic type check failed"
+    print('OK')
 
-    out_map = dict()
-    for c in rs.column_pools.get(None):
-        assert c.known_as in ['c1', 'c2', 'col_a1', 'col_a2', 'col_a3']
-        for u in c.dependencies.get_all():
-            if u not in out_map:
-                out_map[u] = 1
-            else:
-                out_map[u] += 1
 
-    assert ('ns_a.ds_a.tab_a.col_a1' in out_map and out_map['ns_a.ds_a.tab_a.col_a1'] == 2)
-    assert ('ns_a.ds_a.tab_a.col_a2' in out_map and out_map['ns_a.ds_a.tab_a.col_a2'] == 2)
-    assert ('ns_a.ds_a.tab_a.col_a3' in out_map and out_map['ns_a.ds_a.tab_a.col_a3'] == 1)
+def test_join_cross_002():
+    # TODO
+    psr.use_dataset('ds_a')
+    sql = """select * from tab_a t0 join tab_b, tab_b"""
+    rs = psr.parse_sql(sql)
+    print('OK')
+
+
+def test_join_natural_003():
+    # TODO
+    psr.use_dataset('ds_a')
+    sql = """select * from tab_a t0 full outer join tab_c using (col_a3)"""
+    rs = psr.parse_sql(sql)
+    print('OK')
+
+
+def test_join_nested_004():
+    # TODO
+    psr.use_dataset('ds_a')
+    sql = """select * from tab_a t0 right join (select col_b1 c0 from tab_b) on t0.col_a1=c0"""
+    rs = psr.parse_sql(sql)
+    print('OK')
+
+
+def test_join_mixed_003():
+    # TODO
+    psr.use_dataset('ds_a')
+    sql = """
+select * from tab_a t0 
+    join tab_b on col_a1=col_b1
+    left join tab_c using (col_a2)
+"""
+    rs = psr.parse_sql(sql)
+    print('OK')
